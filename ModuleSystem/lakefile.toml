@@ -1,0 +1,6 @@
+name = "ModuleSystem"
+version = "0.1.0"
+defaultTargets = ["ModuleSystem"]
+
+[[lean_lib]]
+name = "ModuleSystem"

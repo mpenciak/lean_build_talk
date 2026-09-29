@@ -134,3 +134,27 @@ Base ──→ Middle ──┐
 
 - Lake records hashes of sources and dependencies in build traces.
 - Importers must be checked against the changed definitions.
+
+---
+
+# 9. The module system hides implementation details
+
+```lean
+-- ModuleSystem/Number.lean
+module
+
+public def number : Nat := 10
+```
+
+```lean
+-- ModuleSystem.lean
+module
+
+import ModuleSystem.Number
+
+public def nextNumber : Nat := number + 1
+```
+
+- `public` makes the name and type available; the body is hidden by default.
+- Change `10` to `20`: only `ModuleSystem.Number` rebuilds.
+- Its public `.olean` stays the same, so the importer is reused.
