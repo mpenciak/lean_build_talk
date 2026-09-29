@@ -116,3 +116,21 @@ lake query --json +Main:imports +Main:transImports
 - Results go to stdout; build progress goes to stderr.
 - Import queries read headers without compiling the modules.
 - `lake build +Main:deps` builds its dependencies, leaving `Main` unbuilt.
+
+---
+
+# 8. Lake rebuilds what depends on a change
+
+```text
+Base ──→ Middle ──┐
+  └────→ Other ───┴──→ Example2
+```
+
+| Change | Modules rebuilt |
+| --- | --- |
+| Nothing | None |
+| `Middle.lean` | `Example2.Middle`, `Example2` |
+| `Base.lean` | All four |
+
+- Lake records hashes of sources and dependencies in build traces.
+- Importers must be checked against the changed definitions.
