@@ -62,12 +62,12 @@ $LEAN_PATH entry / Baz / Basic.olean
 
 | Command | Selection in this project |
 | --- | --- |
-| `lake build` | `defaultTargets = ["example"]` |
-| `lake build @Example` | Package `Example`'s default targets |
-| `lake build Example` | Library `Example` |
-| `lake build example` | Executable `example` (root module `Main`) |
-| `lake build +Example.Basic` | Module `Example.Basic` |
-| `lake build Example/Basic.lean` | Module `Example.Basic` |
+| `lake build` | `defaultTargets = ["targets"]` |
+| `lake build @LakeTargets` | Package `LakeTargets`'s default targets |
+| `lake build LakeTargets` | Library `LakeTargets` |
+| `lake build targets` | Executable `targets` (root module `Main`) |
+| `lake build +LakeTargets.Basic` | Module `LakeTargets.Basic` |
+| `lake build LakeTargets/Basic.lean` | Module `LakeTargets.Basic` |
 
 - A package contains configured targets; a library selects Lean modules.
 - `@package/target` qualifies a target; `+` explicitly selects a module.
@@ -78,7 +78,7 @@ $LEAN_PATH entry / Baz / Basic.olean
 # 6. Facets: which result do we want?
 
 ```sh
-lake build @Example/+Example.Basic:olean
+lake build @LakeTargets/+LakeTargets.Basic:olean
 ```
 
 | Facet | Result |
@@ -102,16 +102,16 @@ Selecting `:olean` can also produce `.ilean` and `.c`: they share a build step.
 # 7. `lake query`: build and print the result
 
 ```sh
-lake query +Example.Basic:olean
+lake query +LakeTargets.Basic:olean
 lake query --json +Main:imports +Main:transImports
 ```
 
 | Facet | Result |
 | --- | --- |
-| `+Main:imports` | Direct workspace imports: `["Example"]` |
-| `+Main:transImports` | Transitive workspace imports: `["Example.Basic", "Example"]` |
-| `Example:modules` | Modules selected by the library |
-| `@Example:deps` | Direct package dependencies |
+| `+Main:imports` | Direct workspace imports: `["LakeTargets"]` |
+| `+Main:transImports` | Transitive workspace imports: `["LakeTargets.Basic", "LakeTargets"]` |
+| `LakeTargets:modules` | Modules selected by the library |
+| `@LakeTargets:deps` | Direct package dependencies |
 
 - Results go to stdout; build progress goes to stderr.
 - Import queries read headers without compiling the modules.
@@ -123,13 +123,13 @@ lake query --json +Main:imports +Main:transImports
 
 ```text
 Base ──→ Middle ──┐
-  └────→ Other ───┴──→ Example2
+  └────→ Other ───┴──→ LakeRebuild
 ```
 
 | Change | Modules rebuilt |
 | --- | --- |
 | Nothing | None |
-| `Middle.lean` | `Example2.Middle`, `Example2` |
+| `Middle.lean` | `LakeRebuild.Middle`, `LakeRebuild` |
 | `Base.lean` | All four |
 
 - Lake records hashes of sources and dependencies in build traces.

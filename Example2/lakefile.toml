@@ -1,6 +1,0 @@
-name = "Example2"
-version = "0.1.0"
-defaultTargets = ["Example2"]
-
-[[lean_lib]]
-name = "Example2"

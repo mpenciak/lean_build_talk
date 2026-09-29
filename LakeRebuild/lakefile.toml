@@ -1,0 +1,6 @@
+name = "LakeRebuild"
+version = "0.1.0"
+defaultTargets = ["LakeRebuild"]
+
+[[lean_lib]]
+name = "LakeRebuild"

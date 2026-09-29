@@ -1,4 +1,4 @@
-import Example
+import LakeTargets
 
 def main : IO Unit :=
   IO.println s!"Hello, {hello}!"
