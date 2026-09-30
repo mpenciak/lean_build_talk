@@ -181,5 +181,25 @@ package «aeneas» where
 [Aeneas lakefile, lines 8–10](https://github.com/AeneasVerif/aeneas/blob/6e167c9b63a4dafd66d0e0edd9d94669f957ff7b/backends/lean/lakefile.lean#L8-L10)
 
 ```sh
-lake build @aeneas:release --no-ansi
+lake build --no-ansi
 ```
+
+---
+
+# 11. Local cache: reuse a previously built version
+
+```toml
+# lakefile.toml
+enableArtifactCache = true
+restoreAllArtifacts = true
+```
+
+| Edit `LocalCache/Value.lean`, then build | Result |
+| --- | --- |
+| `value := 10` | Both modules built and cached |
+| `value := 20` | Both modules built and cached |
+| Back to `value := 10` | Both modules reused from cache |
+
+- Matching inputs reuse earlier artifacts, even after `lake clean`.
+- `.lake/cache` stores the artifacts and JSON mappings for earlier builds.
+- `lake cache clean` clears the cache; `lake clean` clears build outputs.

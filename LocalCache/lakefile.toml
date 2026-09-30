@@ -1,0 +1,8 @@
+name = "LocalCache"
+version = "0.1.0"
+defaultTargets = ["LocalCache"]
+enableArtifactCache = true
+restoreAllArtifacts = true
+
+[[lean_lib]]
+name = "LocalCache"
