@@ -203,3 +203,40 @@ restoreAllArtifacts = true
 - Matching inputs reuse earlier artifacts, even after `lake clean`.
 - `.lake/cache` stores the artifacts and JSON mappings for earlier builds.
 - `lake cache clean` clears the cache; `lake clean` clears build outputs.
+
+---
+
+# 12. Remote cache: share build results between runners
+
+```text
+Runner A ── lake cache put ──▶ S3-compatible cache
+Runner B ◀─ lake cache get ─── S3-compatible cache
+```
+
+- Store build artifacts and mappings from input hashes to outputs.
+- `get` looks for the current commit, then earlier commits if needed.
+- `build` reuses matching artifacts and rebuilds anything affected by changes.
+- A fresh runner can reuse results from a previous runner.
+
+---
+
+# 13. VeriLib: download → build → upload
+
+Configure every runner to use the same remote cache, with artifact caching enabled.
+
+The runner's secret configuration supplies upload credentials as an environment variable:
+
+```sh
+export LAKE_CACHE_KEY="ACCESS_KEY:SECRET_KEY"
+```
+
+```sh
+lake cache get --repo OWNER/PROJECT
+lake build --no-ansi -o outputs.jsonl
+lake cache put outputs.jsonl --repo OWNER/PROJECT
+```
+
+- `-o` exports the mappings that `put` needs to upload.
+- `--repo` scopes the cache by repository, with toolchain/platform information.
+- Cache miss? Build normally. Upload after a successful build.
+- Keep Git history so later requests can find cached earlier commits.
