@@ -39,12 +39,12 @@ theme:
 # 2. Outline
 
 1. What Lean builds
-2. Lake targets, facets, and queries
+2. Lake targets and facets
 3. Rebuilding and the module system
 4. Distributing artifacts with `lake pack`
 5. Sharing artifacts with `lake cache`
 
-Goal: reuse builds across VeriLib runners.
+Goal: how to reuse builds across VeriLib runs.
 
 ---
 
@@ -162,7 +162,7 @@ lake build +LakeTargets.Basic:olean
 └─ packages/    dependencies
 ```
 
-Default: `:leanArts`. One Lean step emits
+Default: `:leanArts`, emits
 `.olean`, `.ilean`, and `.c`.
 
 ---
@@ -288,13 +288,13 @@ Edit `LocalCache/Value.lean`, then build:
 # 14. Share a remote cache
 
 ```text
-Runner A
+Run N
    │ lake cache put
    ▼
 S3-compatible cache
    │ lake cache get
    ▼
-Runner B
+Run N + 1
 ```
 
 - Artifacts + input/output mappings.
