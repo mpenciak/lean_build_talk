@@ -1,0 +1,3 @@
+[submodule "curve25519-dalek-lean-verify"]
+	path = curve25519-dalek-lean-verify
+	url = https://github.com/Beneficial-AI-Foundation/curve25519-dalek-lean-verify.git

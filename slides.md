@@ -158,3 +158,28 @@ public def nextNumber : Nat := number + 1
 - `public` makes the name and type available; the body is hidden by default.
 - Change `10` to `20`: only `ModuleSystem.Number` rebuilds.
 - Its public `.olean` stays the same, so the importer is reused.
+
+---
+
+# 10. `lake pack`: distribute a prebuilt library
+
+```sh
+lake build
+lake pack
+```
+
+- `lake pack` archives the existing build directory; it does not build or upload.
+- Aeneas CI uploads that archive to a GitHub release for the same commit.
+- Downstream projects download and unpack it to reuse Aeneas's build artifacts.
+
+```lean
+package «aeneas» where
+  preferReleaseBuild := true
+  buildArchive := s!"lean-build-aeneas-{System.Platform.target}.tar.gz"
+```
+
+[Aeneas lakefile, lines 8–10](https://github.com/AeneasVerif/aeneas/blob/6e167c9b63a4dafd66d0e0edd9d94669f957ff7b/backends/lean/lakefile.lean#L8-L10)
+
+```sh
+lake build @aeneas:release --no-ansi
+```
