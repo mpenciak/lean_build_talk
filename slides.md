@@ -1,19 +1,74 @@
-# 1. What does Lean build?
+---
+options:
+  end_slide_shorthand: true
+  h1_slide_titles: true
+  incremental_lists: false
+theme:
+  name: catppuccin-mocha
+  override:
+    default:
+      margin:
+        percent: 2
+    slide_title:
+      alignment: left
+      padding_top: 0
+      padding_bottom: 0
+      font_size: 1
+      bold: true
+    code:
+      alignment: left
+      padding:
+        horizontal: 1
+        vertical: 0
+    table:
+      alignment: left
+    footer:
+      style: template
+      left: "Understanding Lake"
+      right: "{current_slide} / {total_slides}"
+---
 
-```text
-Foo.lean → parse + elaborate → kernel-check declarations
-                                  ↓
-                              Environment
-                                  ↓  lean -o …
-                              Foo.olean
-```
+<!-- alignment: center -->
 
-- Elaboration turns terms and tactics into declarations and proof terms.
-- An `.olean` stores module data for later imports.
+# Understanding Lake
+
+(slides at https://github.com/mpenciak/lean_build_talk)
 
 ---
 
-# 2. Inside an `.olean`: `ModuleData`
+# 2. Outline
+
+1. What Lean builds
+2. Lake targets, facets, and queries
+3. Rebuilding and the module system
+4. Distributing artifacts with `lake pack`
+5. Sharing artifacts with `lake cache`
+
+Goal: reuse builds across VeriLib runners.
+
+---
+
+# 3. What does Lean build?
+
+```text
+Foo.lean
+   │ parse + elaborate
+   ▼
+Declarations + proof terms
+   │ kernel checks
+   ▼
+Environment
+   │ lean -o Foo.olean
+   ▼
+Foo.olean
+```
+
+- Elaborate terms and tactics.
+- Save module data for later imports.
+
+---
+
+# 4. Inside an `.olean`
 
 ```lean
 structure ModuleData where
@@ -22,221 +77,252 @@ structure ModuleData where
   constNames      : Array Name
   constants       : Array ConstantInfo
   extraConstNames : Array Name
-  entries         : Array (Name × Array EnvExtensionEntry)
+  entries         :
+    Array (Name × Array EnvExtensionEntry)
 ```
 
-- Declarations include types, definition bodies, and proof terms.
-- Persistent extensions export data such as notation and simp registrations.
-- Stores this module's contributions; imports refer to other modules.
+- Types, bodies, and proof terms.
+- Extensions: notation, simp registrations.
+- This module's contributions only.
+- Imports refer to other modules.
 
 ---
 
-# 3. Imports require built dependencies
+# 5. Build dependencies first
 
 ```text
-Foo.lean  ← imports —  Bar.lean
-   ↓                     ↓
-Foo.olean             Bar.olean
+Bar.lean → Bar.olean
+               │ import
+               ▼
+           Foo.lean
+               │ lean
+               ▼
+           Foo.olean
 ```
 
-- If `Foo` imports `Bar`, then we need to build `Bar` before `Foo`
-- An import restores declarations and persistent extension data.
-- Basically we `mmap` (with offsets) the content of the `olean`
+- `Foo` imports `Bar`: build `Bar` first.
+- Restore declarations and extension data.
+- `mmap` loads `.olean` data by offset.
 
 ---
 
-# 4. Module names are paths
+# 6. Module names are paths
 
 ```text
 import Baz.Basic
-        ↓
-$LEAN_PATH entry / Baz / Basic.olean
+       │ search LEAN_PATH
+       ▼
+<root>/Baz/Basic.olean
 ```
 
-- `lean -R` sets the source root used to calculate the current module's name.
-- `LEAN_PATH` supplies roots for finding imported artifacts.
+- `lean -R` sets the source root.
+- Module names follow source paths.
+- `LEAN_PATH` lists roots to search.
 
 ---
 
-# 5. What does `lake build` build?
+# 7. Choose a build target
 
-| Command | Selection in this project |
+Choose a target for `lake build`:
+
+| Target | Builds |
 | --- | --- |
-| `lake build` | `defaultTargets = ["targets"]` |
-| `lake build @LakeTargets` | Package `LakeTargets`'s default targets |
-| `lake build LakeTargets` | Library `LakeTargets` |
-| `lake build targets` | Executable `targets` (root module `Main`) |
-| `lake build +LakeTargets.Basic` | Module `LakeTargets.Basic` |
-| `lake build LakeTargets/Basic.lean` | Module `LakeTargets.Basic` |
+| (none) | Default `targets` |
+| `@LakeTargets` | Package defaults |
+| `LakeTargets` | Library |
+| `targets` | Executable (`Main`) |
+| `+LakeTargets.Basic` | One module |
+| `LakeTargets/Basic.lean` | One module |
 
-- A package contains configured targets; a library selects Lean modules.
-- `@package/target` qualifies a target; `+` explicitly selects a module.
-- Lake builds the selected target and everything it needs.
+- `@package/target` qualifies a target.
+- `+` explicitly selects a module.
+- Lake also builds everything it needs.
 
 ---
 
-# 6. Facets: which result do we want?
+# 8. Facets and build artifacts
 
 ```sh
-lake build @LakeTargets/+LakeTargets.Basic:olean
+lake build +LakeTargets.Basic:olean
 ```
 
 | Facet | Result |
 | --- | --- |
-| `:leanArts` | `.olean`, `.ilean`, `.c` (module/library default) |
-| `:olean` / `:ilean` | Import data / editor metadata |
-| `:c` / `:o` | Generated C / native object code |
-| `:static` / `:shared` | Library archive / shared library |
+| `:leanArts` | `.olean`, `.ilean`, `.c` |
+| `:olean` / `:ilean` | Import / editor data |
+| `:c` / `:o` | C / native object |
+| `:static` / `:shared` | Archive / shared lib |
 
 ```text
-.lake/build/lib/lean/   .olean, .ilean
-.lake/build/ir/         .c, native objects
-.lake/build/bin/        executables
-.lake/packages/        fetched dependency packages
+.lake/
+├─ build/
+│  ├─ lib/lean/  .olean, .ilean
+│  ├─ ir/        .c, .o
+│  └─ bin/       executables
+└─ packages/    dependencies
 ```
 
-Selecting `:olean` can also produce `.ilean` and `.c`: they share a build step.
+Default: `:leanArts`. One Lean step emits
+`.olean`, `.ilean`, and `.c`.
 
 ---
 
-# 7. `lake query`: build and print the result
+# 9. Query build results
 
 ```sh
 lake query +LakeTargets.Basic:olean
-lake query --json +Main:imports +Main:transImports
+lake query --json \
+  +Main:imports +Main:transImports
 ```
+
+For `+Main`:
 
 | Facet | Result |
 | --- | --- |
-| `+Main:imports` | Direct workspace imports: `["LakeTargets"]` |
-| `+Main:transImports` | Transitive workspace imports: `["LakeTargets.Basic", "LakeTargets"]` |
-| `LakeTargets:modules` | Modules selected by the library |
-| `@LakeTargets:deps` | Direct package dependencies |
+| `:imports` | Direct workspace imports |
+| `:transImports` | Transitive imports |
+| `:deps` | Build dependencies |
 
-- Results go to stdout; build progress goes to stderr.
-- Import queries read headers without compiling the modules.
-- `lake build +Main:deps` builds its dependencies, leaving `Main` unbuilt.
+- `LakeTargets:modules`: library modules.
+- `@LakeTargets:deps`: package dependencies.
+- Results: stdout. Build logs: stderr.
+- Import queries only read headers.
+- `+Main:deps` leaves `Main` unbuilt.
 
 ---
 
-# 8. Lake rebuilds what depends on a change
+# 10. Rebuild what depends on a change
 
 ```text
-Base ──→ Middle ──┐
-  └────→ Other ───┴──→ LakeRebuild
+Base ──▶ Middle ──┐
+  └────▶ Other ───┴──▶ LakeRebuild
 ```
 
-| Change | Modules rebuilt |
+| Change | Rebuilt |
 | --- | --- |
-| Nothing | None |
-| `Middle.lean` | `LakeRebuild.Middle`, `LakeRebuild` |
+| Nothing | Nothing |
+| `Middle.lean` | Middle + root |
 | `Base.lean` | All four |
 
-- Lake records hashes of sources and dependencies in build traces.
-- Importers must be checked against the changed definitions.
+- Traces hash sources and dependencies.
+- Recheck importers of changed definitions.
 
 ---
 
-# 9. The module system hides implementation details
+# 11. The module system
 
 ```lean
 -- ModuleSystem/Number.lean
 module
-
 public def number : Nat := 10
 ```
 
 ```lean
 -- ModuleSystem.lean
 module
-
 import ModuleSystem.Number
-
 public def nextNumber : Nat := number + 1
 ```
 
-- `public` makes the name and type available; the body is hidden by default.
-- Change `10` to `20`: only `ModuleSystem.Number` rebuilds.
-- Its public `.olean` stays the same, so the importer is reused.
+- Public name/type; body hidden by default.
+- `10` → `20`: only Number rebuilds.
+- Public `.olean` unchanged: reuse importer.
 
 ---
 
-# 10. `lake pack`: distribute a prebuilt library
+# 12. Pack a prebuilt library
 
 ```sh
 lake build
 lake pack
 ```
 
-- `lake pack` archives the existing build directory; it does not build or upload.
-- Aeneas CI uploads that archive to a GitHub release for the same commit.
-- Downstream projects download and unpack it to reuse Aeneas's build artifacts.
+- Archive existing outputs; no build/upload.
+- Aeneas CI uploads to a GitHub release.
 
 ```lean
 package «aeneas» where
   preferReleaseBuild := true
-  buildArchive := s!"lean-build-aeneas-{System.Platform.target}.tar.gz"
+  buildArchive :=
+    s!"lean-build-aeneas-" ++
+    s!"{System.Platform.target}.tar.gz"
 ```
 
-[Aeneas lakefile, lines 8–10](https://github.com/AeneasVerif/aeneas/blob/6e167c9b63a4dafd66d0e0edd9d94669f957ff7b/backends/lean/lakefile.lean#L8-L10)
+Aeneas: `backends/lean/lakefile.lean:8–10`
+
+<!--
+Aeneas lakefile source (archive expression wrapped):
+https://github.com/AeneasVerif/aeneas/blob/6e167c9b63a4dafd66d0e0edd9d94669f957ff7b/backends/lean/lakefile.lean#L8-L10
+-->
 
 ```sh
 lake build --no-ansi
 ```
 
+Download and unpack; reuse Aeneas's build.
+
 ---
 
-# 11. Local cache: reuse a previously built version
+# 13. Reuse a cached version
 
 ```toml
-# lakefile.toml
 enableArtifactCache = true
 restoreAllArtifacts = true
 ```
 
-| Edit `LocalCache/Value.lean`, then build | Result |
-| --- | --- |
-| `value := 10` | Both modules built and cached |
-| `value := 20` | Both modules built and cached |
-| Back to `value := 10` | Both modules reused from cache |
+Edit `LocalCache/Value.lean`, then build:
 
-- Matching inputs reuse earlier artifacts, even after `lake clean`.
-- `.lake/cache` stores the artifacts and JSON mappings for earlier builds.
-- `lake cache clean` clears the cache; `lake clean` clears build outputs.
+| Value | Result |
+| --- | --- |
+| `10` | Build both modules |
+| `20` | Build both modules |
+| `10` again | Reuse both modules |
+
+- Matching inputs reuse cached artifacts.
+- `.lake/cache`: artifacts + JSON mappings.
+- `lake clean` clears outputs, not the cache.
+- `lake cache clean` clears the cache.
 
 ---
 
-# 12. Remote cache: share build results between runners
+# 14. Share a remote cache
 
 ```text
-Runner A ── lake cache put ──▶ S3-compatible cache
-Runner B ◀─ lake cache get ─── S3-compatible cache
+Runner A
+   │ lake cache put
+   ▼
+S3-compatible cache
+   │ lake cache get
+   ▼
+Runner B
 ```
 
-- Store build artifacts and mappings from input hashes to outputs.
-- `get` looks for the current commit, then earlier commits if needed.
-- `build` reuses matching artifacts and rebuilds anything affected by changes.
-- A fresh runner can reuse results from a previous runner.
+- Artifacts + input/output mappings.
+- `get`: current or earlier commits.
+- `build`: reuse matching artifacts.
+- Rebuild anything affected by edits.
 
 ---
 
-# 13. VeriLib: download → build → upload
+# 15. VeriLib: reuse previous builds
 
-Configure every runner to use the same remote cache, with artifact caching enabled.
+All runners share one remote cache,
+with artifact caching enabled.
 
-The runner's secret configuration supplies upload credentials as an environment variable:
+```sh
+lake cache get --repo OWNER/PROJECT
+lake build --no-ansi -o outputs.jsonl
+lake cache put outputs.jsonl \
+  --repo OWNER/PROJECT
+```
+
+Upload key from runner secrets:
 
 ```sh
 export LAKE_CACHE_KEY="ACCESS_KEY:SECRET_KEY"
 ```
 
-```sh
-lake cache get --repo OWNER/PROJECT
-lake build --no-ansi -o outputs.jsonl
-lake cache put outputs.jsonl --repo OWNER/PROJECT
-```
-
-- `-o` exports the mappings that `put` needs to upload.
-- `--repo` scopes the cache by repository, with toolchain/platform information.
-- Cache miss? Build normally. Upload after a successful build.
-- Keep Git history so later requests can find cached earlier commits.
+- `-o`: mappings for upload.
+- `--repo`: repository/toolchain/platform.
+- Miss? Build normally; upload on success.
+- Keep Git history for earlier cache entries.
